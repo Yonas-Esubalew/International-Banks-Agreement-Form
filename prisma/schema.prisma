@@ -1,0 +1,109 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRESQL_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id       Int      @id @default(autoincrement())
+  auth0Id  String   @unique // Store Auth0 user id here for linking
+  email    String   @unique
+  fullName String?
+  picture  String?
+  role     UserRole @default(PARTNER_USER)
+
+  bankId Int? // User’s bank affiliation
+  bank   Bank? @relation(fields: [bankId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agreementsCreated Agreement[] @relation("AgreementCreator") // One-to-many to Agreement
+}
+
+model Bank {
+  id                 Int      @id @default(autoincrement())
+  name               String   @db.VarChar(255)
+  registrationNumber String?  @unique
+  taxId              String?  @unique
+  contactEmail       String   @db.VarChar(255)
+  phone              String?  @db.VarChar(20)
+  address            String? // Full address line
+  city               String?  @db.VarChar(100)
+  state              String?  @db.VarChar(100)
+  country            String?  @db.VarChar(100)
+  postalCode         String?  @db.VarChar(20)
+  bankType           BankType @default(MICROFINANCE)
+  ceoName            String?  @db.VarChar(100)
+  ceoEmail           String?  @db.VarChar(255)
+  ctoName            String?  @db.VarChar(100)
+  ctoEmail           String?  @db.VarChar(255)
+
+  licenseNumber  String? // Microfinance license number or regulatory ID
+  branchCount    Int?    @default(0)
+  isKYCCompliant Boolean @default(false)
+  isAMLCompliant Boolean @default(false)
+
+  supportedCurrencies Json? // Example: ["USD", "KES", "UGX"]
+  swiftCode           String?     @db.VarChar(20) // Added SWIFT code field
+  notes               String?     @db.Text
+  users               User[]
+  agreements          Agreement[] @relation("AgreementBanks") // Many-to-many relation
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Agreement {
+  id               Int             @id @default(autoincrement())
+  title            String          @db.VarChar(255)
+  description      String?         @db.Text
+  agreementDate    DateTime        @default(now())
+  expiryDate       DateTime?
+  status           AgreementStatus @default(PENDING) // Workflow status
+  agreementType    AgreementType
+  digitalSignature String?         @db.Text // Base64 encoded signature or image path
+  pdfFilePath      String? // Path or URL to signed PDF stored
+
+  createdById Int
+  createdBy   User @relation("AgreementCreator", fields: [createdById], references: [id]) // Fix one-to-many
+
+  banks Bank[] @relation("AgreementBanks") // Many-to-many with Bank
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum UserRole {
+  ADMIN
+  PARTNER_USER
+}
+
+enum BankType {
+  COMMERCIAL
+  MICROFINANCE
+  COOPERATIVE
+  INVESTMENT
+  DEVELOPMENT
+  CENTRAL
+  SWIFT
+  OTHER
+}
+
+enum AgreementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum AgreementType {
+  LOAN
+  PARTNERSHIP
+  SERVICE
+  NDA
+  OTHER
+}
