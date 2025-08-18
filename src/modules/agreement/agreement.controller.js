@@ -81,7 +81,7 @@ export async function createAgreementForm(req, res) {
   }
 }
 
-/** LIST + FILTER */
+
 export async function getAllAgreementForm(req, res) {
   try {
     const { q, status, type, dateFrom, dateTo, bankId, page, pageSize } =
@@ -108,7 +108,7 @@ export async function getAllAgreementForm(req, res) {
   }
 }
 
-/** GET BY ID */
+
 export async function getAgreementFormById(req, res) {
   try {
     const { id } = req.params;
@@ -130,7 +130,6 @@ export async function getAgreementFormById(req, res) {
   }
 }
 
-/** UPDATE */
 export async function updateAgreementForm(req, res) {
   try {
     const { id } = req.params;
@@ -180,7 +179,6 @@ export async function updateAgreementForm(req, res) {
   }
 }
 
-/** DELETE */
 export async function deleteAgreementForm(req, res) {
   try {
     const { id } = req.params;
@@ -197,7 +195,6 @@ export async function deleteAgreementForm(req, res) {
   }
 }
 
-/** UPLOAD SIGNATURE (multipart/form-data: field `signature`) */
 export async function uploadAgreementSignature(req, res) {
   try {
     const { id } = req.params;
@@ -227,7 +224,6 @@ export async function uploadAgreementSignature(req, res) {
   }
 }
 
-/** UPLOAD PDF (multipart/form-data: field `pdf`) */
 export async function uploadAgreementPdf(req, res) {
   try {
     const { id } = req.params;

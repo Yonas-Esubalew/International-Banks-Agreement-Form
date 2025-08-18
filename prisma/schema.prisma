@@ -8,20 +8,27 @@ generator client {
 }
 
 model User {
-  id       Int      @id @default(autoincrement())
-  auth0Id  String   @unique // Store Auth0 user id here for linking
-  email    String   @unique
-  fullName String?
-  picture  String?
-  role     UserRole @default(PARTNER_USER)
+  id          Int       @id @default(autoincrement())
+  auth0Id     String    @unique
+  email       String    @unique
+  fullName    String?
+  firstName   String?
+  lastName    String?
+  nickname    String?
+  picture     String?
+  accessToken String?
+  isVerified  Boolean   @default(true)
+  lastLogin   DateTime?
 
-  bankId Int? // User’s bank affiliation
-  bank   Bank? @relation(fields: [bankId], references: [id])
+  role        UserRole  @default(PARTNER_USER)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  bankId      Int?
+  bank        Bank?     @relation(fields: [bankId], references: [id])
 
-  agreementsCreated Agreement[] @relation("AgreementCreator") // One-to-many to Agreement
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  agreementsCreated Agreement[] @relation("AgreementsCreatedBy")
 }
 
 model Bank {
@@ -31,7 +38,7 @@ model Bank {
   taxId              String?  @unique
   contactEmail       String   @db.VarChar(255)
   phone              String?  @db.VarChar(20)
-  address            String? // Full address line
+  address            String?
   city               String?  @db.VarChar(100)
   state              String?  @db.VarChar(100)
   country            String?  @db.VarChar(100)
@@ -42,16 +49,17 @@ model Bank {
   ctoName            String?  @db.VarChar(100)
   ctoEmail           String?  @db.VarChar(255)
 
-  licenseNumber  String? // Microfinance license number or regulatory ID
+  licenseNumber  String?
   branchCount    Int?    @default(0)
   isKYCCompliant Boolean @default(false)
   isAMLCompliant Boolean @default(false)
 
-  supportedCurrencies Json? // Example: ["USD", "KES", "UGX"]
-  swiftCode           String?     @db.VarChar(20) // Added SWIFT code field
-  notes               String?     @db.Text
+  supportedCurrencies Json?
+  swiftCode           String?  @db.VarChar(20)
+  notes               String?  @db.Text
+
   users               User[]
-  agreements          Agreement[] @relation("AgreementBanks") // Many-to-many relation
+  agreements          Agreement[] @relation("AgreementBanks")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -63,18 +71,18 @@ model Agreement {
   description      String?         @db.Text
   agreementDate    DateTime        @default(now())
   expiryDate       DateTime?
-  status           AgreementStatus @default(PENDING) // Workflow status
+  status           AgreementStatus @default(PENDING)
   agreementType    AgreementType
-  digitalSignature String?         @db.Text // Base64 encoded signature or image path
-  pdfFilePath      String? // Path or URL to signed PDF stored
+  digitalSignature String?         @db.Text
+  pdfFilePath      String?
 
   createdById Int
-  createdBy   User @relation("AgreementCreator", fields: [createdById], references: [id]) // Fix one-to-many
+  createdBy   User @relation("AgreementsCreatedBy", fields: [createdById], references: [id])
 
-  banks Bank[] @relation("AgreementBanks") // Many-to-many with Bank
+  banks Bank[] @relation("AgreementBanks")
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 enum UserRole {

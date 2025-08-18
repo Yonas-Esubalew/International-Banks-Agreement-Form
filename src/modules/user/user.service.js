@@ -33,16 +33,5 @@ export const getUserById = async (id) => {
   });
 };
 
-export const updateUserProfileImage = async (id, url) => {
-  return await prisma.user.update({
-    where: { id: Number(id) },
-    data: { picture: url }
-  });
-};
 
-export const updateUserRole = async (id, role) => {
-  return await prisma.user.update({
-    where: { id: Number(id) },
-    data: { role }
-  });
-};
+

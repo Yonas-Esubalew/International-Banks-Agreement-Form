@@ -1,21 +1,16 @@
 import express from "express";
-import multer from "multer";
-import { authCallback, loginUser, adminGetUsers, adminGetUserById, uploadProfilePicture } from "../user/user.controller.js";
-import { validateRequest } from "../../middlewares/validateRequest.middleware.js";
-import { loginSchema, getUserByIdSchema, uploadProfileImageSchema,  } from "./user.schema.js";
-// import { isAuthenticated, isAdmin } from "../middlewares/auth.middleware.js";
+import { authCallback, loginUser, adminGetUsers, adminGetUserById, adminDeleteUserById, adminDeleteAllUsers } from "../user/user.controller.js";
+import { Admin, verifyAccessToken } from "../../middlewares/auth0.middleware.js";
 
 const UserRouter = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 UserRouter.get("/auth/callback", authCallback);
-UserRouter.post("/login", validateRequest(loginSchema), loginUser);
+UserRouter.post("/user/login", loginUser);
 
-// Admin
-UserRouter.get("/admin/users", adminGetUsers);
-UserRouter.get("/admin/users/:userId", validateRequest(getUserByIdSchema, "params"), adminGetUserById);
-
-// Upload profile image
-UserRouter.post("/profile/upload", upload.single("picture"), validateRequest(uploadProfileImageSchema), uploadProfilePicture);
+// Protected admin route
+UserRouter.get("/admin/fetch/users",Admin, verifyAccessToken, adminGetUsers);
+UserRouter.get("/admin/fetch/users/:id",Admin, verifyAccessToken, adminGetUserById);
+UserRouter.delete("/admin/delete/users/:id",Admin, verifyAccessToken, adminDeleteUserById);
+UserRouter.delete("/admin/delete/users",Admin, verifyAccessToken, adminDeleteAllUsers);
 
 export default UserRouter;

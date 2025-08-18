@@ -1,4 +1,4 @@
-// /services/bank.service.js
+
 import prisma from "../../config/prisma.js";
 
 export async function createBank(data) {
@@ -13,13 +13,18 @@ export async function getBankById(id) {
   return prisma.bank.findUnique({ where: { id: Number(id) } });
 }
 
-export async function updateBank(id, data) {
+export async function updateBankById(id, data) {
   return prisma.bank.update({
     where: { id: Number(id) },
     data
   });
 }
 
-export async function deleteBank(id) {
+export async function deleteBankById(id) {
   return prisma.bank.delete({ where: { id: Number(id) } });
 }
+
+export async function deleteAllBanks(id) {
+  return prisma.bank.delete({data});
+}
+

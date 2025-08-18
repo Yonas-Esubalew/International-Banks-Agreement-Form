@@ -29,3 +29,4 @@ export const createBankSchema = Joi.object({
 export const updateBankSchema = createBankSchema.fork(Object.keys(createBankSchema.describe().keys), (schema) =>
   schema.optional()
 );
+

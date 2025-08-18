@@ -55,22 +55,37 @@ export const updateUserSchema = Joi.object({
   bankId: Joi.number().integer().optional(),
 });
 
-export const uploadProfileImageSchema = Joi.object({
-  folder: Joi.string().max(50).optional(),
-});
-
 export const getUserByIdSchema = Joi.object({
   userId: Joi.number().integer().required(),
 });
 
 export const loginSchema = Joi.object({
   user: Joi.object({
-    sub: Joi.string().required(),
-    email: Joi.string().email().required(),
+    sub: Joi.string()
+      .pattern(/^auth0\|.+|^google-oauth2\|.+|^facebook\|.+/)
+      .required()
+      .messages({
+        "string.pattern.base": "Invalid user identifier (sub).",
+        "any.required": "User ID (sub) is required.",
+      }),
+    email: Joi.string()
+      .email({ tlds: { allow: false } })
+      .required()
+      .messages({
+        "string.email": "Email must be valid.",
+        "any.required": "Email is required.",
+      }),
     name: Joi.string().min(2).max(100).optional(),
-    picture: Joi.string().uri().optional()
-  }).required()
+    picture: Joi.string().uri().optional(),
+    nickname: Joi.string().optional(),
+    given_name: Joi.string().optional(),
+    family_name: Joi.string().optional(),
+    locale: Joi.string().optional(),
+    email_verified: Joi.boolean().optional(),
+    updated_at: Joi.date().iso().optional(),
+  }).required(),
 });
+
 
 export const logoutSchema = Joi.object({
   user: Joi.object({
@@ -80,6 +95,7 @@ export const logoutSchema = Joi.object({
     picture: Joi.string().uri().optional()
   }).required()
 });
+
 
 export const refreshSchema = Joi.object({
   user: Joi.object({
@@ -134,4 +150,5 @@ export const checkSuperAdminSchema = Joi.object({
     picture: Joi.string().uri().optional()
   }).required()
 });
+
 

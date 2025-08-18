@@ -10,18 +10,17 @@ import {
 } from "../agreement/agreement.controller.js";
 import { uploadSignature, uploadPdf } from "../../middlewares/multer.js";
 
-// Optionally add your auth middleware here, e.g. requireAuth
-
 const AgreementRouter = Router();
 
-AgreementRouter.post("/", /* requireAuth, */ createAgreementForm);
-AgreementRouter.get("/", /* requireAuth, */ getAllAgreementForm);
-AgreementRouter.get("/:id", /* requireAuth, */ getAgreementFormById);
-AgreementRouter.put("/:id", /* requireAuth, */ updateAgreementForm);
-AgreementRouter.delete("/:id", /* requireAuth, */ deleteAgreementForm);
+AgreementRouter.post("/create/agreement", createAgreementForm);
+AgreementRouter.get("/fetch/agreements", getAllAgreementForm);
+AgreementRouter.get("/fetch/agreement/:id",  getAgreementFormById);
+AgreementRouter.put("/update/agreement/:id", updateAgreementForm);
+AgreementRouter.delete("/delete/agreement/:id", deleteAgreementForm);
 
 // uploads
-AgreementRouter.post("/:id/signature", /* requireAuth, */ uploadSignature, uploadAgreementSignature);
-AgreementRouter.post("/:id/pdf", /* requireAuth, */ uploadPdf, uploadAgreementPdf);
+AgreementRouter.post("/upload/:id/signature", /* requireAuth, */ uploadSignature, uploadAgreementSignature);
+AgreementRouter.post("/upload/:id/pdf", uploadPdf, uploadAgreementPdf);
+
 
 export default AgreementRouter;
