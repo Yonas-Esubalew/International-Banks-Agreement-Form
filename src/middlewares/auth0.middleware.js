@@ -81,3 +81,47 @@ export const User = (req, res, next) => {
   }
   next();
 };
+
+
+/* ✅ Agreement Status Guard */
+export const PendingAgreement = async (req, res, next) => {
+  try {
+    const { id } = req.params; // expect :id in route
+    if (!id) {
+      return res.status(400).json({
+        message: "Agreement ID required in request params",
+        success: false,
+      });
+    }
+
+    const agreement = await prisma.agreement.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!agreement) {
+      return res.status(404).json({
+        message: "❌ Agreement not found",
+        success: false,
+      });
+    }
+
+    if (agreement.status !== "PENDING") {
+      return res.status(403).json({
+        message: "❌ Forbidden: Agreement is not in PENDING status",
+        success: false,
+      });
+    }
+
+    // attach to req if needed later
+    req.agreement = agreement;
+    console.log("✅ Agreement is pending:", agreement.id);
+
+    next();
+  } catch (err) {
+    console.error("❌ PendingAgreement Middleware Error:", err);
+    res.status(500).json({
+      message: "Internal Server Error in Agreement Middleware",
+      success: false,
+    });
+  }
+};

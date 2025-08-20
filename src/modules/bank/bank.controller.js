@@ -35,7 +35,6 @@ export async function createBankInfo(req, res) {
   }
 }
 
-/* -------------------- Get bank by ID -------------------- */
 export async function getBankInfoById(req, res) {
   try {
     const { id } = req.params;
@@ -64,7 +63,6 @@ export async function getBankInfoById(req, res) {
   }
 }
 
-/* -------------------- Update bank -------------------- */
 export async function updateBankInfoById(req, res) {
   try {
     const { id } = req.params;
@@ -103,7 +101,6 @@ export async function updateBankInfoById(req, res) {
   }
 }
 
-/* -------------------- Delete bank -------------------- */
 export async function removeBankInfoById(req, res) {
   try {
     const { id } = req.params;
@@ -131,7 +128,6 @@ export async function removeBankInfoById(req, res) {
   }
 }
 
-/* -------------------- Get all banks -------------------- */
 export async function getAllBanks(req, res) {
   try {
     const banks = await prisma.bank.findMany();
@@ -152,7 +148,6 @@ export async function getAllBanks(req, res) {
 
 export async function deleteAllBanks(req, res) {
   try {
-    // Deletes all bank records
     await prisma.bank.deleteMany();
 
     return res.json({

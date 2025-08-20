@@ -12,7 +12,8 @@ export function cloudinaryStreamUpload({ buffer, folder, resource_type = "image"
   });
 }
 
-/** Upload base64 string (signature) or URL passthrough */
 export async function cloudinaryUploadBase64({ base64, folder, resource_type = "image" }) {
   return cloudinary.uploader.upload(base64, { folder, resource_type });
 }
+
+

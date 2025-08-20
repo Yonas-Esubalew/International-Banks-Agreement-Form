@@ -22,68 +22,77 @@ model User {
 
   role        UserRole  @default(PARTNER_USER)
 
+  // Optional relation to the bank the user belongs to
   bankId      Int?
-  bank        Bank?     @relation(fields: [bankId], references: [id])
+  bank        Bank?     @relation("BankUsers", fields: [bankId], references: [id])
+
+  // Banks and Agreements created by this user
+  banksCreated      Bank[]      @relation("BanksCreatedBy")
+  agreementsCreated Agreement[] @relation("AgreementsCreatedBy")
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
-  agreementsCreated Agreement[] @relation("AgreementsCreatedBy")
 }
 
 model Bank {
-  id                 Int      @id @default(autoincrement())
-  name               String   @db.VarChar(255)
-  registrationNumber String?  @unique
-  taxId              String?  @unique
-  contactEmail       String   @db.VarChar(255)
-  phone              String?  @db.VarChar(20)
+  id                 Int       @id @default(autoincrement())
+  name               String
+  registrationNumber String?   @unique
+  taxId              String?   @unique
+  contactEmail       String
+  phone              String?
   address            String?
-  city               String?  @db.VarChar(100)
-  state              String?  @db.VarChar(100)
-  country            String?  @db.VarChar(100)
-  postalCode         String?  @db.VarChar(20)
-  bankType           BankType @default(MICROFINANCE)
-  ceoName            String?  @db.VarChar(100)
-  ceoEmail           String?  @db.VarChar(255)
-  ctoName            String?  @db.VarChar(100)
-  ctoEmail           String?  @db.VarChar(255)
-
-  licenseNumber  String?
-  branchCount    Int?    @default(0)
-  isKYCCompliant Boolean @default(false)
-  isAMLCompliant Boolean @default(false)
-
+  city               String?
+  state              String?
+  country            String?
+  postalCode         String?
+  bankType           BankType  @default(MICROFINANCE)
+  ceoName            String?
+  ceoEmail           String?
+  ctoName            String?
+  ctoEmail           String?
+  licenseNumber      String?
+  branchCount        Int?      @default(0)
+  isKYCCompliant     Boolean   @default(false)
+  isAMLCompliant     Boolean   @default(false)
   supportedCurrencies Json?
-  swiftCode           String?  @db.VarChar(20)
-  notes               String?  @db.Text
+  swiftCode          String?
+  notes              String?
 
-  users               User[]
-  agreements          Agreement[] @relation("AgreementBanks")
+  // Relations
+  users       User[]      @relation("BankUsers")          // Users that belong to this bank
+  agreements  Agreement[] @relation("BankAgreements")     // Agreements linked to this bank
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdById Int @default(1)
+  createdBy   User @relation("BanksCreatedBy", fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Agreement {
-  id               Int             @id @default(autoincrement())
-  title            String          @db.VarChar(255)
-  description      String?         @db.Text
-  agreementDate    DateTime        @default(now())
-  expiryDate       DateTime?
-  status           AgreementStatus @default(PENDING)
-  agreementType    AgreementType
-  digitalSignature String?         @db.Text
-  pdfFilePath      String?
+  id              Int       @id @default(autoincrement())
+  title           String
+  description     String?
+  agreementDate   DateTime
+  expiryDate      DateTime?
+  status          AgreementStatus
+  agreementType   AgreementType
+  digitalSignature String?
+  pdfFilePath     String?
 
+  // Relation to User (who created it)
   createdById Int
   createdBy   User @relation("AgreementsCreatedBy", fields: [createdById], references: [id])
 
-  banks Bank[] @relation("AgreementBanks")
+  // Relation to Bank
+  bankId Int?
+  bank   Bank? @relation("BankAgreements", fields: [bankId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
 
 enum UserRole {
   ADMIN
@@ -103,7 +112,7 @@ enum BankType {
 
 enum AgreementStatus {
   PENDING
-  APPROVED
+  ACTIVE
   REJECTED
   EXPIRED
 }

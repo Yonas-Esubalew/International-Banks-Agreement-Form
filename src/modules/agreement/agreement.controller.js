@@ -1,254 +1,206 @@
+// agreement.controller.js
 import {
-  createAgreement,
-  listAgreements,
-  getAgreementById,
-  updateAgreement,
-  deleteAgreement,
-  setAgreementSignatureUrl,
-  setAgreementPdfUrl,
-} from "../agreement/agreement.service.js";
-import {
-  createAgreementSchema,
-  updateAgreementSchema,
-} from "../agreement/agreement.schema.js";
-import { prismaErrorToResponse } from "../../utils/prismaErrors.js";
-import {
-  cloudinaryStreamUpload,
-  cloudinaryUploadBase64,
-} from "../../utils/cloudinaryUpload.js";
+  createAgreementService,
+  getAllAgreementsService,
+  getAgreementByIdService,
+  updateAgreementService,
+  deleteAgreementService,
+  getAgreementsByStatusService,
+  getAgreementsByUserService,
+  getAgreementsByAgreementTypeService,
+  uploadAgreementFileService,
+  uploadSignatureFileService,
+} from "./agreement.service.js";
 
-/** CREATE */
-export async function createAgreementForm(req, res) {
-  try {
-    if (!req.body || typeof req.body !== "object") {
-      return res.status(400).json({
-        success: false,
-        message: "❌ Invalid request format",
-        details: "Body must be a JSON object",
-      });
-    }
+// 🔥 Centralized error handler
+const handleErrors = (res, error, context) => {
+  console.error(`❌ ${context} Error:`, error);
 
-    const userId = req.user?.id;
-    if (!userId) {
-      return res
-        .status(401)
-        .json({ success: false, message: "❌ Authentication required" });
-    }
-
-    const { error, value } = createAgreementSchema.validate(req.body, {
-      abortEarly: false,
-    });
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: "❌ Validation error",
-        errors: error.details.map((d) => d.message),
-      });
-    }
-
-    const { bankIds, digitalSignature, pdfFilePath, ...rest } = value;
-
-    // optional base64 signature upload
-    let signatureUrl = null;
-    if (digitalSignature && digitalSignature.startsWith("data:")) {
-      const result = await cloudinaryUploadBase64({
-        base64: digitalSignature,
-        folder: "agreements/signatures",
-        resource_type: "image",
-      });
-      signatureUrl = result.secure_url;
-    }
-
-    const created = await createAgreement({
-      data: {
-        ...rest,
-        createdById: Number(userId),
-        ...(signatureUrl ? { digitalSignature: signatureUrl } : {}),
-        ...(pdfFilePath ? { pdfFilePath } : {}), // if you already have a url
-      },
-      bankIds,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "✅ Agreement created successfully",
-      data: created,
-    });
-  } catch (err) {
-    console.error("❌ Create agreement error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
+  if (error.code === "P2025") {
+    return res.status(404).json({ success: false, message: "❌ Agreement not found" });
   }
-}
 
+  res.status(500).json({
+    success: false,
+    message: error.message || `❌ Unexpected error during ${context}`,
+  });
+};
 
-export async function getAllAgreementForm(req, res) {
+/* 1. Create Agreement */
+export async function createAgreement(req, res) {
   try {
-    const { q, status, type, dateFrom, dateTo, bankId, page, pageSize } =
-      req.query;
-    const result = await listAgreements({
-      q,
-      status,
-      type,
-      dateFrom,
-      dateTo,
-      bankId,
-      page,
-      pageSize,
-    });
-    return res.status(200).json({
-      success: true,
-      message: "✅ Agreements fetched successfully",
-      ...result,
-    });
-  } catch (err) {
-    console.error("❌ Fetch agreements error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
-  }
-}
-
-
-export async function getAgreementFormById(req, res) {
-  try {
-    const { id } = req.params;
-    const agreement = await getAgreementById(id);
-    if (!agreement) {
-      return res
-        .status(404)
-        .json({ success: false, message: "❌ Agreement not found" });
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "❌ User not authenticated",
+      });
     }
-    return res.status(200).json({
+
+    const agreement = await createAgreementService(req.body, req.user.id);
+
+    res.status(201).json({
       success: true,
-      message: "✅ Agreement fetched successfully",
+      message: "✅ Agreement created",
       data: agreement,
     });
   } catch (err) {
-    console.error("❌ Get agreement error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
+    console.error("Create Agreement Error:", err);
+    res.status(500).json({
+      success: false,
+      message: `❌ Create Agreement Error: ${err.message}`,
+    });
   }
 }
 
-export async function updateAgreementForm(req, res) {
+/* 2. Get All Agreements */
+export async function getAllAgreements(req, res) {
   try {
-    const { id } = req.params;
+    const agreements = await getAllAgreementsService();
+    res.json({ 
+        message: "✅ Agreements fetched successfully",
+        success: true, count: agreements.length, data: agreements });
+  } catch (err) {
+    handleErrors(res, err, "Get All Agreements");
+  }
+}
 
-    const { error, value } = updateAgreementSchema.validate(req.body, {
-      abortEarly: false,
-    });
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: "❌ Validation error",
-        errors: error.details.map((d) => d.message),
-      });
+/* 3. Get Agreement by ID */
+export async function getAgreement(req, res) {
+  try {
+    const agreement = await getAgreementByIdService(req.params.id);
+
+    if (!agreement) {
+      return res.status(404).json({ success: false, message: "❌ Agreement not found" });
     }
 
-    const { bankIds, digitalSignature, pdfFilePath, ...data } = value;
-
-    // optional base64 signature upload on update
-    let signatureUrl = undefined;
-    if (digitalSignature && digitalSignature.startsWith("data:")) {
-      const result = await cloudinaryUploadBase64({
-        base64: digitalSignature,
-        folder: "agreements/signatures",
-        resource_type: "image",
-      });
-      signatureUrl = result.secure_url;
-    }
-
-    const updated = await updateAgreement(id, {
-      data: {
-        ...data,
-        ...(signatureUrl ? { digitalSignature: signatureUrl } : {}),
-        ...(pdfFilePath ? { pdfFilePath } : {}),
-      },
-      bankIds,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "✅ Agreement updated successfully",
-      data: updated,
-    });
+    res.json({
+        message: "✅ Agreement fetched successfully by ID",
+        success: true, data: agreement });
   } catch (err) {
-    console.error("❌ Update agreement error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
+    handleErrors(res, err, "Get Agreement");
   }
 }
 
-export async function deleteAgreementForm(req, res) {
+/* 4. Update Agreement */
+export async function updateAgreement(req, res) {
   try {
-    const { id } = req.params;
-    const deleted = await deleteAgreement(id);
-    return res.status(200).json({
-      success: true,
-      message: "✅ Agreement deleted successfully",
-      data: deleted,
-    });
+    const updated = await updateAgreementService(req.params.id, req.body);
+    res.json({ success: true, message: "✅ Agreement updated successfully", data: updated });
   } catch (err) {
-    console.error("❌ Delete agreement error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
+    handleErrors(res, err, "Update Agreement");
   }
 }
 
-export async function uploadAgreementSignature(req, res) {
+/* 5. Delete Agreement */
+export async function deleteAgreement(req, res) {
   try {
-    const { id } = req.params;
-
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, message: "❌ No signature file provided" });
-    }
-    const result = await cloudinaryStreamUpload({
-      buffer: req.file.buffer,
-      folder: "agreements/signatures",
-      resource_type: "image",
-    });
-
-    await setAgreementSignatureUrl(id, result.secure_url);
-    return res.status(200).json({
-      success: true,
-      message: "✅ Signature uploaded",
-      url: result.secure_url,
-      public_id: result.public_id,
-    });
+    const deleted = await deleteAgreementService(req.params.id);
+    res.json({ success: true, message: "✅ Agreement deleted successfully", data: deleted });
   } catch (err) {
-    console.error("❌ Upload signature error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
+    handleErrors(res, err, "Delete Agreement");
   }
 }
 
-export async function uploadAgreementPdf(req, res) {
+/* 6. Get Agreements by Status */
+export async function getAgreementsByStatus(req, res) {
   try {
-    const { id } = req.params;
-
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, message: "❌ No PDF file provided" });
-    }
-    const result = await cloudinaryStreamUpload({
-      buffer: req.file.buffer,
-      folder: "agreements/pdfs",
-      resource_type: "raw", // important for PDF
-    });
-
-    await setAgreementPdfUrl(id, result.secure_url);
-    return res.status(200).json({
-      success: true,
-      message: "✅ PDF uploaded",
-      url: result.secure_url,
-      public_id: result.public_id,
-    });
+    const agreements = await getAgreementsByStatusService(req.params.status);
+    res.json({
+        message: "✅ Agreements fetched successfully by Status",
+        success: true, count: agreements.length, data: agreements });
   } catch (err) {
-    console.error("❌ Upload pdf error:", err);
-    const { status, body } = prismaErrorToResponse(err);
-    return res.status(status).json(body);
+    handleErrors(res, err, "Get Agreements by Status");
   }
 }
+
+/* 7. Get Agreements by User */
+export async function getAgreementsByUser(req, res) {
+  try {
+    const agreements = await getAgreementsByUserService(req.params.userId);
+    res.json({
+        message: "✅ Agreements fetched successfully by User",
+        success: true, count: agreements.length, data: agreements });
+  } catch (err) {
+    handleErrors(res, err, "Get Agreements by User");
+  }
+}
+
+export async function getAgreementsByAgreementType(req, res) {
+  try {
+    const agreements = await getAgreementsByAgreementTypeService(req.params.agreementType);
+    res.json({ 
+        message: "✅ Agreements fetched successfully by Agreement Type",
+        success: true, count: agreements.length, data: agreements });
+  } catch (err) {
+    handleErrors(res, err, "Get Agreements by Agreement Type");
+  }
+} 
+
+// export async function uploadAgreementFile(req, res) {
+//   try {
+//     const { id } = req.params;
+//     const file = req.file;
+
+//     const updated = await uploadAgreementFileService(id, file);
+
+//     res.status(200).json({
+//       success: true,
+//       message: "✅ Agreement file uploaded successfully to Cloudinary",
+//       data: {
+//         id: updated.id,
+//         pdfFilePath: updated.pdfFilePath,
+//       },
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Upload failed",
+//     });
+//   }
+// }
+
+
+
+
+export const uploadAgreementFile = async (req, res) => {
+  try {
+    const agreementId = Number(req.params.id);
+    if (!agreementId) throw new Error("Agreement ID is required");
+
+    const file = req.file; // Multer parses this
+    if (!file) throw new Error("Missing required parameter - file");
+
+    // Upload PDF and update agreement
+    const updatedAgreement = await uploadAgreementFileService(agreementId, file);
+
+    res.status(200).json({
+      success: true,
+      message: "✅ File uploaded successfully to Cloudinary",
+      data: updatedAgreement, // send the full updated agreement
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+
+export const uploadSignatureFile = async (req, res) => {
+  try {
+    const agreementId = Number(req.params.id);
+    if (!agreementId) throw new Error("Agreement ID is required");
+
+    const file = req.file; // Multer parses this
+    if (!file) throw new Error("Missing required parameter - file");
+
+    // Upload PDF and update agreement
+    const updatedAgreement = await uploadSignatureFileService(agreementId, file);
+
+    res.status(200).json({
+      success: true,
+      message: "✅ File uploaded successfully to Cloudinary",
+      data: updatedAgreement, // send the full updated agreement
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

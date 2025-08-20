@@ -1,79 +1,176 @@
-import prisma from "../../config/prisma.js";
+// agreement.service.js
+import prisma from "../../../prisma/prisma.js";
+import cloudinary from "../../config/cloudinary.js";
 
-export async function createAgreement({ data, bankIds = [] }) {
-  return prisma.agreement.create({
+export async function createAgreementService(data, userId) {
+  // 1️⃣ Validate user exists
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error(`User with id ${userId} does not exist`);
+  }
+
+  // 2️⃣ Validate required fields
+  if (!data.title || !data.agreementDate || !data.expiryDate) {
+    throw new Error("Missing required agreement fields: title, agreementDate, expiryDate");
+  }
+
+  // 3️⃣ Validate bankId if provided
+  let bankConnect = undefined;
+  if (data.bankId) {
+    const bankIdNum = Number(data.bankId);
+    if (isNaN(bankIdNum)) {
+      throw new Error("Invalid bankId");
+    }
+
+    const bank = await prisma.bank.findUnique({ where: { id: bankIdNum } });
+    if (!bank) {
+      throw new Error(`Bank with id ${bankIdNum} does not exist`);
+    }
+
+    bankConnect = { connect: { id: bankIdNum } };
+  }
+
+  // 4️⃣ Create the agreement
+  const agreement = await prisma.agreement.create({
     data: {
-      ...data,
-      // connect many-to-many banks
-      banks: bankIds.length ? { connect: bankIds.map((id) => ({ id })) } : undefined,
+      title: data.title,
+      description: data.description || "",
+      agreementDate: new Date(data.agreementDate),
+      expiryDate: new Date(data.expiryDate),
+      status: data.status || "PENDING",
+      agreementType: data.agreementType || "OTHER",
+      digitalSignature: data.digitalSignature || "",
+      pdfFilePath: data.pdfFilePath || "",
+      createdBy: { connect: { id: userId } }, // ✅ taken from logged-in user
+      bank: bankConnect, // ✅ single bank relation
     },
-    include: { banks: true, createdBy: { select: { id: true, name: true, email: true } } },
+    include: {
+      createdBy: true,
+      bank: true,
+    },
+  });
+
+  return agreement;
+}
+
+// Get all
+export async function getAllAgreementsService() {
+  return prisma.agreement.findMany({
+    include: { bank: true, createdBy: true },
   });
 }
 
-export async function listAgreements({ q, status, type, dateFrom, dateTo, bankId, page = 1, pageSize = 20 }) {
-  const where = {
-    ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
-    ...(status ? { status } : {}),
-    ...(type ? { agreementType: type } : {}),
-    ...(bankId ? { banks: { some: { id: Number(bankId) } } } : {}),
-    ...(dateFrom || dateTo
-      ? {
-          agreementDate: {
-            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-            ...(dateTo ? { lte: new Date(dateTo) } : {}),
-          },
-        }
-      : {}),
-  };
-
-  const skip = (Number(page) - 1) * Number(pageSize);
-  const [data, total] = await Promise.all([
-    prisma.agreement.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: Number(pageSize),
-      include: { banks: true, createdBy: { select: { id: true, name: true, email: true } } },
-    }),
-    prisma.agreement.count({ where }),
-  ]);
-
-  return { data, total, page: Number(page), pageSize: Number(pageSize) };
-}
-
-export async function getAgreementById(id) {
+// Get by ID
+export async function getAgreementByIdService(id) {
   return prisma.agreement.findUnique({
     where: { id: Number(id) },
-    include: { banks: true, createdBy: { select: { id: true, name: true, email: true } } },
+    include: { bank: true, createdBy: true },
   });
 }
 
-export async function updateAgreement(id, { data, bankIds }) {
+// Update
+export async function updateAgreementService(id, data) {
   return prisma.agreement.update({
     where: { id: Number(id) },
     data: {
       ...data,
-      ...(Array.isArray(bankIds)
-        ? {
-            banks: {
-              set: bankIds.map((bid) => ({ id: bid })), // replace links
-            },
-          }
-        : {}),
+      bank: data.bank
+        ? { set: data.bank.map(id => ({ id })) }
+        : undefined,
     },
-    include: { banks: true, createdBy: { select: { id: true, name: true, email: true } } },
+    include: { bank: true, createdBy: true },
   });
 }
 
-export async function deleteAgreement(id) {
-  return prisma.agreement.delete({ where: { id: Number(id) } });
+// Delete
+export async function deleteAgreementService(id) {
+  return prisma.agreement.delete({
+    where: { id: Number(id) },
+  });
 }
 
-export async function setAgreementSignatureUrl(id, url) {
-  return prisma.agreement.update({ where: { id: Number(id) }, data: { digitalSignature: url } });
+// Get by Status
+export async function getAgreementsByStatusService(status) {
+  return prisma.agreement.findMany({
+    where: { status },
+    include: { bank: true, createdBy: true },
+  });
 }
 
-export async function setAgreementPdfUrl(id, url) {
-  return prisma.agreement.update({ where: { id: Number(id) }, data: { pdfFilePath: url } });
+// Get by User
+export async function getAgreementsByUserService(userId) {
+  return prisma.agreement.findMany({
+    where: { createdById: Number(userId) },
+    include: { bank: true, createdBy: true },
+  });
 }
+
+export async function getAgreementsByAgreementTypeService(agreementType) {
+  return prisma.agreement.findMany({
+    where: { agreementType },
+    include: { bank: true, createdBy: true },
+  });
+}
+
+
+export const uploadAgreementFileService = async (agreementId, file) => {
+  if (!file) throw new Error("Missing required parameter - file");
+
+  // 1️⃣ Upload PDF to Cloudinary
+  const result = await new Promise((resolve, reject) => {
+  const stream = cloudinary.uploader.upload_stream(
+    {
+      folder: 'agreements',
+      resource_type: 'raw',
+      public_id: file.originalname.split('.')[0], // optional: keep original name
+      use_filename: true,
+      unique_filename: false, // prevents Cloudinary from renaming
+    },
+    (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    }
+  );
+  stream.end(file.buffer);
+});
+
+
+  // 2️⃣ Update agreement in DB
+  const updatedAgreement = await prisma.agreement.update({
+    where: { id: agreementId },
+    data: { pdfFilePath: result.secure_url },
+  });
+
+  return updatedAgreement;
+};
+
+
+export const uploadSignatureFileService = async (agreementId, file) => {
+  if (!file) throw new Error("Missing required parameter - file");
+// upload image to cloudinary
+
+const result = await new Promise((resolve, reject) => {
+  const stream = cloudinary.uploader.upload_stream(
+    {
+      folder: 'signatures',
+      resource_type: 'image',
+      public_id: file.originalname.split('.')[0], 
+      use_filename: true,
+      unique_filename: false, 
+    },
+    (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    }
+  );
+  stream.end(file.buffer);
+});
+
+  // 2️⃣ Update agreement in DB
+  const updatedAgreement = await prisma.agreement.update({
+    where: { id: agreementId },
+    data: { digitalSignature: result.secure_url },
+  });
+
+  return updatedAgreement;
+};

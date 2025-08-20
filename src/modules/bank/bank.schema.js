@@ -1,4 +1,3 @@
-// /schemas/bank.schema.js
 import Joi from "joi";
 
 export const createBankSchema = Joi.object({

@@ -74,6 +74,8 @@ const AUTH_CONFIG = {
   clientSecret: process.env.AUTH0_CLIENT_SECRET,
   audience: process.env.AUTH0_AUDIENCE,
 };
+
+
 // --------------------- 1️⃣ Fetch Access Token ---------------------
 async function getAccessToken() {
   try {
@@ -144,7 +146,6 @@ async function verifyToken(token) {
   }
 }
 
-// --------------------- 3️⃣ Usage Example ---------------------
 (async () => {
   try {
     const token = await getAccessToken();
@@ -155,8 +156,6 @@ async function verifyToken(token) {
   }
 })();
 
-
-// ---------------------------- Startup -----------------------------
 const start = async () => {
   try {
     await prisma.$connect();
@@ -172,7 +171,6 @@ const start = async () => {
   }
 };
 
-// ---------------------------- Graceful Shutdown -----------------------------
 const shutdown = async (signal) => {
   console.log(chalk.cyan(`\n${signal} received. Shutting down...`));
   try {
