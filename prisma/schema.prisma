@@ -117,6 +117,7 @@ enum AgreementStatus {
   EXPIRED
 }
 
+
 enum AgreementType {
   LOAN
   PARTNERSHIP

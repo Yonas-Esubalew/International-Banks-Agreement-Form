@@ -9,7 +9,7 @@ UserRouter.post("/user/login", loginUser);
 
 // Protected admin route
 UserRouter.get("/admin/fetch/users",Admin, verifyAccessToken, adminGetUsers);
-UserRouter.get("/admin/fetch/users/:id", verifyAccessToken, adminGetUserById);
+UserRouter.get("/admin/fetch/users/:id", verifyAccessToken, Admin,adminGetUserById);
 UserRouter.delete("/admin/delete/users/:id",Admin, verifyAccessToken, adminDeleteUserById);
 UserRouter.delete("/admin/delete/users",Admin, verifyAccessToken, adminDeleteAllUsers);
 

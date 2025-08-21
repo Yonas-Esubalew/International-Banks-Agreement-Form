@@ -1,6 +1,7 @@
 // agreement.service.js
 import prisma from "../../../prisma/prisma.js";
 import cloudinary from "../../config/cloudinary.js";
+import streamifier from "streamifier";
 
 export async function createAgreementService(data, userId) {
   // 1️⃣ Validate user exists
@@ -11,7 +12,9 @@ export async function createAgreementService(data, userId) {
 
   // 2️⃣ Validate required fields
   if (!data.title || !data.agreementDate || !data.expiryDate) {
-    throw new Error("Missing required agreement fields: title, agreementDate, expiryDate");
+    throw new Error(
+      "Missing required agreement fields: title, agreementDate, expiryDate"
+    );
   }
 
   // 3️⃣ Validate bankId if provided
@@ -74,9 +77,7 @@ export async function updateAgreementService(id, data) {
     where: { id: Number(id) },
     data: {
       ...data,
-      bank: data.bank
-        ? { set: data.bank.map(id => ({ id })) }
-        : undefined,
+      bank: data.bank ? { set: data.bank.map((id) => ({ id })) } : undefined,
     },
     include: { bank: true, createdBy: true },
   });
@@ -87,6 +88,12 @@ export async function deleteAgreementService(id) {
   return prisma.agreement.delete({
     where: { id: Number(id) },
   });
+}
+
+
+// Service: delete all agreements
+export async function deleteAllAgreementsService() {
+  return prisma.agreement.deleteMany(); // deletes all records
 }
 
 // Get by Status
@@ -112,28 +119,40 @@ export async function getAgreementsByAgreementTypeService(agreementType) {
   });
 }
 
-
 export const uploadAgreementFileService = async (agreementId, file) => {
-  if (!file) throw new Error("Missing required parameter - file");
+  if (!file) throw new Error("❌ Missing required parameter - file");
 
-  // 1️⃣ Upload PDF to Cloudinary
+  // Extract filename and extension
+  const originalName = file.originalname;
+  const baseName = originalName.replace(/\.[^/.]+$/, ""); // remove extension
+  const extension = originalName.split(".").pop().toLowerCase(); // e.g. pdf
+  const publicId = `${baseName}`; // let Cloudinary handle extension
+
+  // 1️⃣ Upload file to Cloudinary
   const result = await new Promise((resolve, reject) => {
-  const stream = cloudinary.uploader.upload_stream(
-    {
-      folder: 'agreements',
-      resource_type: 'raw',
-      public_id: file.originalname.split('.')[0], // optional: keep original name
-      use_filename: true,
-      unique_filename: false, // prevents Cloudinary from renaming
-    },
-    (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    }
-  );
-  stream.end(file.buffer);
-});
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "agreements",
+        resource_type: "raw", // ✅ auto handles pdf correctly
+        public_id: publicId, 
+        format: "pdf",
+        use_filename: true,
+        unique_filename: false,
+        overwrite: true,       // allow re-upload
+      },
+      (error, result) => {
+        if (error) {
+          return reject(
+            new Error(`❌ Cloudinary upload failed: ${error.message}`)
+          );
+        }
+        resolve(result);
+      }
+    );
 
+    // send file buffer
+    streamifier.createReadStream(file.buffer).pipe(stream);
+  });
 
   // 2️⃣ Update agreement in DB
   const updatedAgreement = await prisma.agreement.update({
@@ -141,35 +160,41 @@ export const uploadAgreementFileService = async (agreementId, file) => {
     data: { pdfFilePath: result.secure_url },
   });
 
-  return updatedAgreement;
+  // 3️⃣ Return updated agreement with clean URL
+  return {
+    ...updatedAgreement,
+    pdfFileUrl: result.secure_url,   // ✅ always ends with .pdf
+    cloudinaryId: result.public_id,  // ✅ optional for delete later
+    resourceType: result.resource_type,
+  };
 };
 
-
 export const uploadSignatureFileService = async (agreementId, file) => {
-  if (!file) throw new Error("Missing required parameter - file");
-// upload image to cloudinary
+  if (!file) throw new Error("❌ Missing required parameter - file");
 
-const result = await new Promise((resolve, reject) => {
-  const stream = cloudinary.uploader.upload_stream(
-    {
-      folder: 'signatures',
-      resource_type: 'image',
-      public_id: file.originalname.split('.')[0], 
-      use_filename: true,
-      unique_filename: false, 
-    },
-    (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    }
-  );
-  stream.end(file.buffer);
-});
+  // 1️⃣ Upload signature image to Cloudinary
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "signatures", // or profile_pictures, etc.
+        resource_type: "image", // ✅ tell Cloudinary it’s an image
+        format: "jpg", // ✅ force jpg extension
+        use_filename: true,
+        unique_filename: false,
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    streamifier.createReadStream(file.buffer).pipe(stream);
+  });
 
-  // 2️⃣ Update agreement in DB
+  // 2️⃣ Update agreement record in DB with Cloudinary URL
   const updatedAgreement = await prisma.agreement.update({
     where: { id: agreementId },
     data: { digitalSignature: result.secure_url },
+    include: { createdBy: true, bank: true },
   });
 
   return updatedAgreement;

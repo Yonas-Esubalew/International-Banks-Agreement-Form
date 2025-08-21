@@ -10,6 +10,7 @@ import {
   getAgreementsByAgreementTypeService,
   uploadAgreementFileService,
   uploadSignatureFileService,
+  deleteAllAgreementsService,
 } from "./agreement.service.js";
 
 // 🔥 Centralized error handler
@@ -101,6 +102,20 @@ export async function deleteAgreement(req, res) {
   }
 }
 
+
+export async function deleteAllAgreements(req, res) {
+  try {
+    const result = await deleteAllAgreementsService();
+    res.json({
+      success: true,
+      message: `✅ All agreements deleted successfully (${result.count} records removed)`,
+      data: result,
+    });
+  } catch (err) {
+    handleErrors(res, err, "Delete All Agreements");
+  }
+}
+
 /* 6. Get Agreements by Status */
 export async function getAgreementsByStatus(req, res) {
   try {
@@ -136,71 +151,48 @@ export async function getAgreementsByAgreementType(req, res) {
   }
 } 
 
-// export async function uploadAgreementFile(req, res) {
-//   try {
-//     const { id } = req.params;
-//     const file = req.file;
-
-//     const updated = await uploadAgreementFileService(id, file);
-
-//     res.status(200).json({
-//       success: true,
-//       message: "✅ Agreement file uploaded successfully to Cloudinary",
-//       data: {
-//         id: updated.id,
-//         pdfFilePath: updated.pdfFilePath,
-//       },
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message || "Upload failed",
-//     });
-//   }
-// }
-
-
-
-
 export const uploadAgreementFile = async (req, res) => {
   try {
     const agreementId = Number(req.params.id);
     if (!agreementId) throw new Error("Agreement ID is required");
 
-    const file = req.file; // Multer parses this
+    const file = req.file; 
     if (!file) throw new Error("Missing required parameter - file");
 
-    // Upload PDF and update agreement
     const updatedAgreement = await uploadAgreementFileService(agreementId, file);
 
     res.status(200).json({
       success: true,
       message: "✅ File uploaded successfully to Cloudinary",
-      data: updatedAgreement, // send the full updated agreement
+      data: updatedAgreement,
     });
+    
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
-
 export const uploadSignatureFile = async (req, res) => {
   try {
     const agreementId = Number(req.params.id);
-    if (!agreementId) throw new Error("Agreement ID is required");
 
-    const file = req.file; // Multer parses this
-    if (!file) throw new Error("Missing required parameter - file");
+    if (!agreementId) {
+      return res.status(400).json({ success: false, message: "❌ Agreement ID is required" });
+    }
 
-    // Upload PDF and update agreement
-    const updatedAgreement = await uploadSignatureFileService(agreementId, file);
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "❌ No signature file uploaded" });
+    }
+
+    const updatedAgreement = await uploadSignatureFileService(agreementId, req.file);
 
     res.status(200).json({
       success: true,
-      message: "✅ File uploaded successfully to Cloudinary",
-      data: updatedAgreement, // send the full updated agreement
+      message: "✅ Signature uploaded successfully to Cloudinary",
+      data: updatedAgreement,
     });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    console.error("❌ Upload Signature Error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
